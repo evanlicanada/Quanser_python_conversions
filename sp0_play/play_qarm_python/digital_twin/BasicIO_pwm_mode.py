@@ -13,7 +13,7 @@ import numpy as np
 
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QCheckBox, QLineEdit, QSlider, QPushButton
+    QLabel, QLineEdit, QSlider, QPushButton
 )
 from PyQt6.QtCore import Qt, QTimer
 
@@ -41,7 +41,7 @@ phiLim = [-3.5, 3.5]          # Angular position limits (rad)
 phiDotLim = [-2.0, 2.0]       # Angular speed limits (rad/s)
 currentLim = [-2.0, 2.0]      # Motor current limits (A)
 gripperLim = [0.0, 1.0]       # Gripper position limits (0.0 open - 1.0 closed)
-pwmLim = [-0.5, 0.5]          # PWM duty cycle limits (-0.5 to 0.5)
+pwmLim = [-1.0, 1.0]          # PWM duty cycle limits (-1.0 to 1.0)
 tempLim = [20.0, 50.0]        # Motor temperature limits (°C)
 # endregion
 
@@ -103,8 +103,6 @@ multiScope.axes[5].attachSignal(name='wristTemp')
 hardwareMode = 0            # 0 for Virtual QArm (Digital Twin), 1 for Physical Hardware
 readMode = 0                # 0 for Immediate I/O, 1 for Task-based I/O
 jointMode = 1               # 0 for Position Mode, 1 for PWM Mode
-target_sweep = 0.10         # Oscillation PWM amplitude (10% duty cycle / 1.2V)
-oscillationPeriod = 3.0     # Time in seconds between oscillation direction flips
 scopeSampleInterval = 0.02  # Sampling rate for scope data collection (50 Hz)
 defaultLedColor = [0, 1, 0] # Base LED color (Green)
 # endregion
@@ -159,30 +157,48 @@ if app is None:
 
 control_window = QWidget()
 control_window.setWindowTitle("QArm Control Panel (PWM Mode)")
-control_window.resize(420, 340)
+control_window.resize(460, 320)
 
 main_layout = QVBoxLayout()
 control_window.setLayout(main_layout)
 
-title_label = QLabel("<b>Joint PWM & Oscillation Control</b><br><small>PWM values range from -1.0 to 1.0 (typically ±0.1 to ±0.2)</small>")
+title_label = QLabel(
+    "<b>Joint PWM Control</b><br>"
+    "<small>Click -1 / 0 / +1 for directional testing, or enter custom PWM values (-1.0 to 1.0)</small>"
+)
 title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 main_layout.addWidget(title_label)
 
-joint_toggles = []
 joint_entries = []
 
-# Build the 4 rows for joint PWM inputs and oscillation toggles
+# Build the 4 rows for joint PWM inputs and -1 / 0 / +1 buttons
 for i in range(4):
     row_layout = QHBoxLayout()
-    row_layout.addWidget(QLabel(f"Joint {i} PWM:"))
+    row_layout.addWidget(QLabel(f"Joint {i}:"))
 
-    toggle = QCheckBox("Oscillate")
-    row_layout.addWidget(toggle)
-    joint_toggles.append(toggle)
+    btn_neg = QPushButton("-1")
+    btn_zero = QPushButton("0")
+    btn_pos = QPushButton("+1")
+
+    btn_neg.setFixedWidth(45)
+    btn_zero.setFixedWidth(45)
+    btn_pos.setFixedWidth(45)
 
     entry = QLineEdit("0.0")
-    row_layout.addWidget(entry)
+    entry.setFixedWidth(75)
+    entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
     joint_entries.append(entry)
+
+    # Connect buttons to autofill the custom number box
+    btn_neg.clicked.connect(lambda _, e=entry: e.setText("-1.0"))
+    btn_zero.clicked.connect(lambda _, e=entry: e.setText("0.0"))
+    btn_pos.clicked.connect(lambda _, e=entry: e.setText("1.0"))
+
+    row_layout.addWidget(btn_neg)
+    row_layout.addWidget(btn_zero)
+    row_layout.addWidget(btn_pos)
+    row_layout.addWidget(QLabel("PWM:"))
+    row_layout.addWidget(entry)
 
     main_layout.addLayout(row_layout)
 
@@ -196,52 +212,35 @@ grip_layout.addWidget(gripper_slider)
 main_layout.addLayout(grip_layout)
 
 # Emergency Stop / Zero All PWM Button
-btn_zero = QPushButton("Stop / Zero All PWM")
+btn_zero_all = QPushButton("Stop / Zero All PWM")
 def zero_all():
     for entry in joint_entries:
         entry.setText("0.0")
-    for toggle in joint_toggles:
-        toggle.setChecked(False)
-btn_zero.clicked.connect(zero_all)
-main_layout.addWidget(btn_zero)
+btn_zero_all.clicked.connect(zero_all)
+main_layout.addWidget(btn_zero_all)
 
 control_window.show()
 
 # 5. Periodic Control Loop via QTimer
-last_move_t = time.time()
-direction_multiplier = 1
-
 def control_step():
-    global direction_multiplier, last_move_t
-
-    # Step A: Update oscillation direction if interval elapsed
-    now = time.time()
-    if now - last_move_t > oscillationPeriod:
-        direction_multiplier *= -1
-        last_move_t = now
-
-    # Step B: Read GUI inputs and form PWM command
+    # Read GUI inputs and form PWM command
     for i in range(4):
         try:
             target_val = float(joint_entries[i].text())
         except ValueError:
             target_val = 0.0
-
-        if joint_toggles[i].isChecked():
-            desired_joint_pwm[i] = target_sweep * direction_multiplier
-        else:
-            desired_joint_pwm[i] = target_val
+        desired_joint_pwm[i] = target_val
 
     gripper_val = gripper_slider.value() / 100.0
 
-    # Step C: Send physical PWM commands to arm and read feedback
+    # Send physical PWM commands to arm and read feedback
     myArm.read_write_pwm(
         desired_joint_pwm,
         gprCMD=gripper_val,
         baseLED=desired_LED_color
     )
 
-    # Step D: Refresh MultiScope plots
+    # Refresh MultiScope plots
     MultiScope.refreshAll()
 
 # 6. Start Qt Timer and Event Loop
