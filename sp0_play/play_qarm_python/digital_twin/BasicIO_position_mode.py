@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer
 
-from pal.products.qarm import QArm
 from hal.products.qarm import QArmUtilities
 from hal.content.qarm import QArmKeyboardNavigator, DataIO, PlotData
 
@@ -27,6 +26,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from modified_library.scope import Scope, XYScope, MultiScope, TYAxis
+from modified_library.qarm import QArm
 # endregion
 
 
@@ -205,30 +205,34 @@ direction_multiplier = 1
 def control_step():
     global direction_multiplier, last_move_t
 
-    # Step A: Update arm commands periodically
+    # Step A: Update oscillation direction if period has elapsed
     now = time.time()
     if now - last_move_t > oscillationPeriod:
         direction_multiplier *= -1
-        for i in range(4):
-            try:
-                target_val = float(joint_entries[i].text())
-            except ValueError:
-                target_val = 0.0
-
-            if joint_toggles[i].isChecked():
-                desired_joint_pos[i] = target_sweep * direction_multiplier
-            else:
-                desired_joint_pos[i] = target_val
-
-        gripper_val = gripper_slider.value() / 100.0
-        myArm.read_write_std(
-            desired_joint_pos,
-            gprCMD=gripper_val,
-            baseLED=desired_LED_color
-        )
         last_move_t = now
 
-    # Step B: Refresh MultiScope plots
+    # Step B: Read GUI inputs and form position command
+    for i in range(4):
+        try:
+            target_val = float(joint_entries[i].text())
+        except ValueError:
+            target_val = 0.0
+
+        if joint_toggles[i].isChecked():
+            desired_joint_pos[i] = target_sweep * direction_multiplier
+        else:
+            desired_joint_pos[i] = target_val
+
+    gripper_val = gripper_slider.value() / 100.0
+
+    # Step C: Send position commands and read latest hardware telemetry EVERY tick (30 Hz)
+    myArm.read_write_std(
+        desired_joint_pos,
+        gprCMD=gripper_val,
+        baseLED=desired_LED_color
+    )
+
+    # Step D: Refresh MultiScope plots
     MultiScope.refreshAll()
 
 # 6. Start Qt Timer and Event Loop

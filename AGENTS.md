@@ -35,7 +35,8 @@ python conversions/
 │       │   ├── BasicIO_position_mode.py     # Lab 0: Position mode with GUI & MultiScope
 │       │   └── BasicIO_pwm_mode.py          # Lab 0: PWM open-loop mode with GUI & MultiScope
 │       └── hardware/
-│           └── play.py                      # Hardware teleoperation & plotting script
+│           ├── play.py                      # Hardware teleoperation & plotting script
+│           └── play_pwm_mode.py             # Hardware PWM sequential direction verification (Space toggle)
 └── qarm.py                                  # (Legacy workspace prototype; prefer modified_library.qarm)
 ```
 
@@ -118,6 +119,9 @@ PyQtGraph automatically auto-scales any axis where `yLim` is not provided. When 
    - Samples sensor data and calls `multiScope.axes[i].sample(t, data)`.
    - Must loop on `while not KILL_THREAD:`.
    - On shutdown, always set `KILL_THREAD = True` and call `myArm.terminate()` to close HIL sockets and prevent orphaned background connections.
+4. **Continuous Hardware I/O in Control Step:**
+   - Always call `myArm.read_write_std(...)` or `myArm.read_write_pwm(...)` **on every tick of `control_step`** (30 Hz).
+   - **Never wrap the `read_write_*` call inside an oscillation or period timer block.** In Quanser's architecture, sensor attributes (`measJointPosition`, `measJointSpeed`, etc.) are only polled from the hardware/simulator inside `read_write_*`. If the I/O call is throttled to once every 3 seconds, the background `scope_loop` samples stale data, resulting in noticeable scope delay. Only the oscillation direction logic should be time-gated.
 
 ---
 
@@ -127,7 +131,9 @@ PyQtGraph automatically auto-scales any axis where `yLim` is not provided. When 
 |---|---|---|
 | `sp0_play/play_qarm_python/digital_twin/BasicIO_position_mode.py` | Position Mode (`jointMode=0`) | Controls 4 joint angles & gripper via PyQt GUI panel; monitors 6 real-time signals on `MultiScope`. |
 | `sp0_play/play_qarm_python/digital_twin/BasicIO_pwm_mode.py` | PWM Mode (`jointMode=1`) | Open-loop voltage commands (-12V to 12V); features `-1`, `0`, `+1` directional autofill buttons and custom PWM input to test gravity fall, joint conventions, and hold voltages. |
-| `sp0_play/play_qarm_python/hardware/play.py` | Hardware Teleoperation | Uses `QKeyboard` and forward kinematics for hardware joint movement and plotting. |
+| `sp0_play/play_qarm_python/hardware/play_position_mode.py` | Position Mode (`jointMode=0`, hardware) | Hardware equivalent of `BasicIO_position_mode.py`; controls physical arm angles & gripper with real-time `MultiScope` teleoperation. |
+| `sp0_play/play_qarm_python/hardware/play_pwm_mode.py` | Hardware PWM Direction Testing (`jointMode=1`) | Sequential ±1 PWM actuation across 4 joints (Base, Shoulder, Elbow, Wrist) to verify direction conventions; Spacebar toggle to start/stop immediately; interactive "What is about to move?" UI cards. |
+| `sp0_play/play_qarm_python/hardware/play.py` | Hardware Teleoperation (Legacy) | Uses `QKeyboard` and forward kinematics for hardware joint movement and plotting. |
 
 ---
 

@@ -3,6 +3,11 @@
 Temperary Documents live in:
 https://drive.google.com/drive/folders/12CBtRyjxJgaLnXKr31zrNcBCggSQFpnT?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto
 
+## General Bug Fixes
+- In QArmUtilities.forward_kinematics
+    - If phi is passed in as an integer array (or non float), no erroris thrown and an incorrect output is the result due to truncation
+    - added `theta = np.array(phi, dtype=float, copy=True)` in the copy to ensure a float array is the result
+
 ## SP0_Play
 
 ### Modified: pal/products/qarm.py
