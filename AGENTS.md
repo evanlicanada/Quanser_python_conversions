@@ -42,7 +42,11 @@ python conversions/
 │       ├── digital_twin/
 │       │   ├── LowLevelControlPositionMode.py # Baseline position control benchmark
 │       │   └── LowLevelControlPWMMode.py      # Interactive closed-loop PID tuning & gravity dynamics
-│       └── hardware/                        # (Hardware scripts pending)
+│       └── hardware/
+│           ├── LowLevelControlWristPosition.py   # Part 1: Physical wrist position baseline
+│           ├── LowLevelControlWristPWM.py        # Part 2: Hybrid wrist PD tuning + Saturation & Rate Limiter
+│           ├── LowLevelControlWristCurrent.py    # Part 3: Wrist current mode & cable harness asymmetry
+│           └── LowLevelControlNonLinearEffects.py# Part 4: Physical gravity scenarios & navigation
 └── qarm.py                                  # (Legacy workspace prototype; prefer modified_library.qarm)
 ```
 
@@ -62,8 +66,13 @@ Quanser's vendor libraries (`pal.utilities.scope` and `pal.products.qarm`) live 
      ```
 
 2. **`modified_library.qarm`:**
-   - **Why:** Upstream Quanser `pal.products.qarm.QArm` hardcodes Position Mode (`j0_mode=0; ...`) and has no support for PWM open-loop voltage control.
-   - **Fix:** Subclasses `QArm`, adds `jointMode=0` (Position) and `jointMode=1` (PWM), and adds `myArm.read_write_pwm(pwmCMD, gprCMD, baseLED)` writing to HIL channels `[11000:11003]`.
+   - **Why:** Upstream Quanser `pal.products.qarm.QArm` hardcodes Position Mode (`j0_mode=0; ...`) and has no support for PWM open-loop voltage control, hybrid modes, or current control.
+   - **Fix:** Subclasses `QArm`, adds support for:
+     - `jointMode=0` (Position Mode for all joints).
+     - `jointMode=1` (PWM Mode for all joints).
+     - `jointMode=[j0, j1, j2, j3]` (Hybrid Modes, e.g. `[0, 0, 0, 1]` for Position Base/Shoulder/Elbow and PWM Wrist, or `[0, 0, 0, 254]` for Current Wrist).
+     - `myArm.read_write_pwm(pwmCMD, phiCMD=..., gprCMD=..., baseLED=...)` writing to HIL channels `[11000:11003]` and `[1000:1003]`.
+     - `myArm.read_write_current(currentCMD, phiCMD=..., gprCMD=..., baseLED=...)` writing to analog channel 3 and `[1000:1003]`.
    - **Import:**
      ```python
      from modified_library.qarm import QArm
@@ -142,6 +151,10 @@ PyQtGraph automatically auto-scales any axis where `yLim` is not provided. When 
 | `sp0_play/play_qarm_python/hardware/play.py` | Hardware Teleoperation (Legacy) | Uses `QKeyboard` and forward kinematics for hardware joint movement and plotting. |
 | `sp4_kinematic_manipulation/l1_low_level_control/digital_twin/LowLevelControlPositionMode.py` | Position Mode (`jointMode=0`) | Baseline position control benchmark; monitors tracking error, speed, currents during pulse tests and Point A ↔ B navigation. |
 | `sp4_kinematic_manipulation/l1_low_level_control/digital_twin/LowLevelControlPWMMode.py` | PWM Mode (`jointMode=1`) | Interactive engineering lab; real-time PID gain tuning grid, exploration pulse tests, 3 gravitational non-linear scenarios (Table 1), and Point A ↔ B evaluation against baseline. |
+| `sp4_kinematic_manipulation/l1_low_level_control/hardware/LowLevelControlWristPosition.py` | Position Mode (`jointMode=0`, hardware) | Part 1: Physical hardware baseline; elevates arm to safe inspection pose and records wrist tracking, speed, and acceleration. |
+| `sp4_kinematic_manipulation/l1_low_level_control/hardware/LowLevelControlWristPWM.py` | Hybrid Position/PWM (`jointMode=[0,0,0,1]`) | Part 2: Safe hybrid wrist PD tuning; features live PWM Saturation (speed limit ≤ 90°/s) and Slew Rate Limiter (accel limit ≤ 60°/s²). |
+| `sp4_kinematic_manipulation/l1_low_level_control/hardware/LowLevelControlWristCurrent.py` | Hybrid Position/Current (`jointMode=[0,0,0,254]`) | Part 3: Physical wrist current control across amplitudes (±10° to ±40°) to observe cable harness spring tension/friction asymmetry. |
+| `sp4_kinematic_manipulation/l1_low_level_control/hardware/LowLevelControlNonLinearEffects.py` | Position Mode (`jointMode=0`, hardware) | Part 4: Physical gravity cross-coupling evaluation; safely runs Scenarios 1–3 and Point A ↔ B on physical hardware to record real current surges. |
 
 ---
 
