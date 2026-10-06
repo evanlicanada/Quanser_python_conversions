@@ -37,6 +37,12 @@ python conversions/
 │       └── hardware/
 │           ├── play.py                      # Hardware teleoperation & plotting script
 │           └── play_pwm_mode.py             # Hardware PWM sequential direction verification (Space toggle)
+├── sp4_kinematic_manipulation/              # Skills Progression 4 - Kinematic Manipulation
+│   └── l1_low_level_control/
+│       ├── digital_twin/
+│       │   ├── LowLevelControlPositionMode.py # Baseline position control benchmark
+│       │   └── LowLevelControlPWMMode.py      # Interactive closed-loop PID tuning & gravity dynamics
+│       └── hardware/                        # (Hardware scripts pending)
 └── qarm.py                                  # (Legacy workspace prototype; prefer modified_library.qarm)
 ```
 
@@ -134,6 +140,8 @@ PyQtGraph automatically auto-scales any axis where `yLim` is not provided. When 
 | `sp0_play/play_qarm_python/hardware/play_position_mode.py` | Position Mode (`jointMode=0`, hardware) | Hardware equivalent of `BasicIO_position_mode.py`; controls physical arm angles & gripper with real-time `MultiScope` teleoperation. |
 | `sp0_play/play_qarm_python/hardware/play_pwm_mode.py` | Hardware PWM Direction Testing (`jointMode=1`) | Sequential ±1 PWM actuation across 4 joints (Base, Shoulder, Elbow, Wrist) to verify direction conventions; Spacebar toggle to start/stop immediately; interactive "What is about to move?" UI cards. |
 | `sp0_play/play_qarm_python/hardware/play.py` | Hardware Teleoperation (Legacy) | Uses `QKeyboard` and forward kinematics for hardware joint movement and plotting. |
+| `sp4_kinematic_manipulation/l1_low_level_control/digital_twin/LowLevelControlPositionMode.py` | Position Mode (`jointMode=0`) | Baseline position control benchmark; monitors tracking error, speed, currents during pulse tests and Point A ↔ B navigation. |
+| `sp4_kinematic_manipulation/l1_low_level_control/digital_twin/LowLevelControlPWMMode.py` | PWM Mode (`jointMode=1`) | Interactive engineering lab; real-time PID gain tuning grid, exploration pulse tests, 3 gravitational non-linear scenarios (Table 1), and Point A ↔ B evaluation against baseline. |
 
 ---
 
